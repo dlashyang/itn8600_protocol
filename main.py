@@ -5,7 +5,7 @@ Created on 2013-6-30
 @author: dlash
 '''
 
-PHYSICALID = '0x70.0a.01.08.0100101001.000000'
+PHYSICALID = '0x70.0a.10.08.0100101001.000000'
 
 def main(f_name):
     f = open('%s.csv' % f_name)
@@ -45,66 +45,74 @@ def main(f_name):
                     pkt_create_payload = ''
                     length = 0
                     for item in tbl_data['create']:
-                        pkt_create_payload += '.%s%04d.%s' % (item_data[item]['id'], item_data[item]['length'], item)
+                        pkt_create_payload += '.%s%04x.%s' % (item_data[item]['id'], (item_data[item]['length'] + 0x8000), item)
                         length += item_data[item]['length'] + 1 + 2
-                    pkt_create_payload = '%s.%04d%s' % (tbl_data['tbl_id'], length, pkt_create_payload)
+                    pkt_create_payload = '%s.%04x%s' % (tbl_data['tbl_id'], (length + 0x8000), pkt_create_payload)
                     length += 6
                     pkt_create_payload = '0x60.%s.%s' % (genIdxLen(length), pkt_create_payload)
-                    wf.write('  create:%s;%s;%s\n' % (pkt_create_fun, obj_idx, pkt_create_payload))
-                    wf.write('  delete:%s;%s;60\n' % (pkt_create_fun, obj_idx))
+                    wf.write('create:\n%s\n%s\n%s\n' % (pkt_create_fun, obj_idx, pkt_create_payload))
+                    wf.write('create raw:\n%s\n%s\n%s\n' % (pkt_create_fun.replace('.', ''), obj_idx.replace('.', ''), pkt_create_payload.replace('.', '')))
+                    wf.write('delete:\n%s\n%s\n0x60\n' % (pkt_create_fun, obj_idx))
+                    wf.write('delete raw:\n%s\n%s\n0x60\n' % (pkt_create_fun.replace('.', ''), obj_idx.replace('.', '')))
 
                 if not tbl_data['get'] == []:
                     pkt_get_fun = '0x30.07.10.05.%sFF' % tbl_data['tbl_id']
                     pkt_get_payload = ''
                     length = 0
                     for item in tbl_data['get']:
-                        pkt_get_payload += '.%s.0000' % (item_data[item]['id'])
+                        pkt_get_payload += '.%s.8000' % (item_data[item]['id'])
                         length += 1 + 2
-                    pkt_get_payload = '%s.%04d%s' % (tbl_data['tbl_id'], length, pkt_get_payload)
+                    pkt_get_payload = '%s.%04x%s' % (tbl_data['tbl_id'], (length + 0x8000), pkt_get_payload)
                     length += 6
                     pkt_get_payload = '0x60.%s.%s' % (genIdxLen(length), pkt_get_payload)
 
-                    wf.write('  get all:%s;%s;%s\n' % (pkt_get_fun, PHYSICALID, pkt_get_payload))
+                    wf.write('get all:\n%s\n%s\n%s\n' % (pkt_get_fun, PHYSICALID, pkt_get_payload))
+                    wf.write('get all raw:\n%s\n%s\n%s\n' % (pkt_get_fun.replace('.', ''), PHYSICALID.replace('.', ''), pkt_get_payload.replace('.', '')))
                     if not tbl_data['index'] == []:
-                        wf.write('  get:%s;%s;%s\n' % (pkt_get_fun, obj_idx, pkt_get_payload))
+                        wf.write('get:\n%s\n%s\n%s\n' % (pkt_get_fun, obj_idx, pkt_get_payload))
+                        wf.write('get raw:\n%s\n%s\n%s\n' % (pkt_get_fun.replace('.', ''), obj_idx.replace('.', ''), pkt_get_payload.replace('.', '')))
                     wf.write('\n')
 
                 for item in tbl_data['item']:
                     if item_data[item]['set']:
                         length = 0
                         pkt_set_fun = '0x10.07.10.05.%s%s' % (tbl_data['tbl_id'], item_data[item]['id'])
-                        pkt_set_payload = '%s.%04d.%s' % (item_data[item]['id'], item_data[item]['length'], item)
+                        pkt_set_payload = '%s.%04x.%s' % (item_data[item]['id'], (item_data[item]['length'] + 0x8000), item)
                         length += item_data[item]['length'] + 1 + 2
-                        pkt_set_payload = '%s.%04d.%s' % (tbl_data['tbl_id'], length, pkt_set_payload)
+                        pkt_set_payload = '%s.%04x.%s' % (tbl_data['tbl_id'], (length + 0x8000), pkt_set_payload)
                         length += 6
                         pkt_set_payload = '0x60.%s.%s' % (genIdxLen(length), pkt_set_payload)
-                        wf.write('  %s.set:%s;%s;%s\n' % (item, pkt_set_fun, obj_idx, pkt_set_payload))
+                        wf.write('%s.set:\n%s\n%s\n%s\n' % (item, pkt_set_fun, obj_idx, pkt_set_payload))
+                        wf.write('%s.set raw:\n%s\n%s\n%s\n' % (item, pkt_set_fun.replace('.', ''), obj_idx.replace('.', ''), pkt_set_payload.replace('.', '')))
 
                     if item_data[item]['get']:
                         length = 0
                         pkt_get_fun = '0x30.07.10.05.%s%s' % (tbl_data['tbl_id'], item_data[item]['id'])
-                        pkt_get_payload = '%s.0000' % (item_data[item]['id'])
+                        pkt_get_payload = '%s.8000' % (item_data[item]['id'])
                         length += 1 + 2
-                        pkt_get_payload = '%s.%04d.%s' % (tbl_data['tbl_id'], length, pkt_get_payload)
+                        pkt_get_payload = '%s.%04x.%s' % (tbl_data['tbl_id'], (length + 0x8000), pkt_get_payload)
                         length += 6
                         pkt_get_payload = '0x60.%s.%s' % (genIdxLen(length), pkt_get_payload)
-                        wf.write('  %s.get:%s;%s;%s\n' % (item, pkt_get_fun, obj_idx, pkt_get_payload))
+                        wf.write('%s.get:\n%s\n%s\n%s\n' % (item, pkt_get_fun, obj_idx, pkt_get_payload))
+                        wf.write('%s.get raw:\n%s\n%s\n%s\n' % (item, pkt_get_fun.replace('.', ''), obj_idx.replace('.', ''), pkt_get_payload.replace('.', '')))
 
                     wf.write('\n')
 
                 for combo_idx in tbl_data['combo']:
                     pkt_set_fun = '0x10.07.10.05.%s%s' % (tbl_data['tbl_id'], combo_idx)
                     pkt_set_payload = ''
-                    wf.write('  0x%s(' % combo_idx),
+                    wf.write('0x%s.set(' % combo_idx),
                     for item in item_data[combo_idx]:
                         length = 0
-                        pkt_set_payload += '.%s%04d.%s' % (item_data[item]['id'], item_data[item]['length'], item)
+                        pkt_set_payload += '.%s%04x.%s' % (item_data[item]['id'], (item_data[item]['length'] + 0x8000), item)
                         length += item_data[item]['length'] + 1 + 2
                         wf.write('%s,' % item),
-                    pkt_set_payload = '%s.%04d.%s' % (tbl_data['tbl_id'], length, pkt_set_payload)
+                    wf.write(')\n')
+                    pkt_set_payload = '%s.%04x%s' % (tbl_data['tbl_id'], (length + 0x8000), pkt_set_payload)
                     length += 6
                     pkt_set_payload = '0x60.%s.%s' % (genIdxLen(length), pkt_set_payload)
-                    wf.write(').set:%s;%s;%s\n' % (pkt_set_fun, obj_idx, pkt_set_payload))
+                    wf.write('%s\n%s\n%s\n' % (pkt_set_fun, obj_idx, pkt_set_payload))
+                    wf.write('raw:\n%s\n%s\n%s\n' % (pkt_set_fun.replace('.', ''), obj_idx.replace('.', ''), pkt_set_payload.replace('.', '')))
 
                     wf.write('\n')
 
@@ -115,7 +123,7 @@ def main(f_name):
             tbl_data['create'] = []
             tbl_data['get'] = []
             tbl_data['index'] = []
-            tbl_data['combo'] = []
+            tbl_data['combo'] = set()
         elif data[0][:2].lower() == '0x':
             data = data[:11]
             if not tbl_data.has_key('tbl_id'):
@@ -139,7 +147,7 @@ def main(f_name):
 
             if not data[10].strip() == '':
                 item_data[data[2]]['set'] = 0
-                tbl_data['combo'].append(data[10])
+                tbl_data['combo'].add(data[10])
                 if item_data.has_key(data[10]):
                     item_data[data[10]].append(data[2])
                 else:
