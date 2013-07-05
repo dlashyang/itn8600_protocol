@@ -4,6 +4,11 @@ Created on 2013-7-3
 @author: dlash
 '''
 
+PHYSICALID = '10.08.0100101001.000000'
+ITEM_ID_LEN = 1
+TABLE_ID_LEN = 4
+PAYLOAD_LENGTH_LEN = 2
+
 class ptn_table(object):
     '''
     classdocs
@@ -46,8 +51,10 @@ class ptn_table(object):
         create_list = []
         index_list = []
         get_list = []
-        
         combine_item = {}
+
+        for comb_idx in self.combine_list:
+            combine_item[comb_idx] = []
 
         for item in self.item:
             if 'C' in item.getAttr():
@@ -66,32 +73,28 @@ class ptn_table(object):
                 item.setPkt('get.payload', genPayload(self.tbl_id, [item], 'get'))
 
             if not item.combine_id == '':
-                self.combine_list.add(item.combine_id)
-                if combine_item.has_key(item.combine_id):
-                    combine_item[item.combine_id].append(item)
-                else:
-                    combine_item[item.combine_id] = [item]
-
+                combine_item[item.combine_id].append(item)
 
         self.pkt['obj_idx'] = genObjIdx(self.tbl_id, index_list, self.tbl_type)
         self.pkt['create.fun_idx'] = genFunIdx(self.tbl_id, 'FF', 'create')
         self.pkt['create.payload'] = genPayload(self.tbl_id, create_list, 'set')
         self.pkt['get.fun_idx'] = genFunIdx(self.tbl_id, 'FF', 'get')
         self.pkt['get.payload'] = genPayload(self.tbl_id, get_list, 'get')
-        
-        for comb in self.combine_list:
-            self.pkt['%s.fun_idx' % comb] = genFunIdx(self.tbl_id, comb, 'set')
-            self.pkt['%s.payload' % comb] = genPayload(self.tbl_id, combine_item[comb], 'set')
+
+        for comb_idx in self.combine_list:
+            self.pkt['%s.fun_idx' % comb_idx] = genFunIdx(self.tbl_id, comb_idx, 'set')
+            self.pkt['%s.payload' % comb_idx] = genPayload(self.tbl_id, combine_item[comb_idx], 'set')
 
 class ptn_item(object):
     '''
     classdocs
     '''
 
-    def __init__(self, name, item_id, item_len):
+    def __init__(self, name, item_id, item_len, item_type):
         self.item_name = name
         self.item_id = item_id
         self.item_len = int(item_len)
+        self.item_type = item_type
         self.combine_id = ''
         self.attrib = ''
         self.packet = {}
@@ -157,13 +160,24 @@ class ptn_item(object):
         self.attrib = self.attrib.replace('M', '')
         self.combine_id = combine_id
 
-
-def genLen_Index(pkt):
+def genLen(pkt):
     if type(pkt) == int:
         length = pkt
     elif type(pkt) == str:
-        pkt = pkt.replace('.', '').replace('[', '').replace(']', '')
-        length = len(pkt) / 2
+        pkt = pkt.replace('.', '')
+        var_len = 0
+        while '[' in pkt and ']' in pkt:
+            start = pkt.find('[')
+            end = pkt.find(']')
+            var_data = pkt[start + 1:end]
+            if '|' in var_data:
+                var_len += int(var_data[var_data.find('|') + 1:])
+            else:
+                var_len += len(var_data)
+
+            pkt = pkt[:start] + pkt[end + 1:]
+
+        length = len(pkt) / 2 + var_len
 
     if length < 0x80:
         return '%02x' % length
@@ -174,73 +188,65 @@ def genLen_Index(pkt):
     elif length < 0x10000000:
         return '%08x' % (length + 0xe0000000)
 
-
-def genLen_Payload(pkt):
-    if type(pkt) == int:
-        length = pkt
-    elif type(pkt) == str:
-        pkt = pkt.replace('.', '').replace('[', '').replace(']', '')
-        length = len(pkt) / 2
-
-    return '%04x' % (length + 0x8000)
-
-PHYSICALID = '0x70.0a.10.08.0100101001.000000'
 def genObjIdx(tbl_id, index_list, flag):
     obj_idx = ''
-    length = 0
-    for item in index_list:
-        if item == index_list[-1]:
-            obj_type = '10'
-            if flag == 'Dynamic':
-                obj_type = '30'
-            obj_idx += '%s.%s.%s%s.%s' % (obj_type, genLen_Index(item.getItemLen() + 5), tbl_id, item.getItemId(), item.getItemName())
-        else:
-            obj_type = '00'
-            if flag == 'Dynamic':
-                obj_type = '20'
-            obj_idx += '%s.%s.%s%s.%s.' % (obj_type, genLen_Index(item.getItemLen() + 5), tbl_id, item.getItemId(), item.getItemName())
-        length += item.getItemLen() + 5 + len(genLen_Index(item.getItemLen() + 5)) / 2 + 1
-
-    if length == 0:
-        obj_idx = PHYSICALID
+    if len(index_list) == 0:
+        obj_idx = '0x70.%s.%s' % (genLen(PHYSICALID), PHYSICALID)
     else:
-        obj_idx = '0x70.%s.00.08.0100101001.000000.%s' % (genLen_Index(length + 10), obj_idx)
+        for item in index_list:
+            obj_type = 0
+            if item == index_list[-1]:
+                obj_type |= 1 << 4
+
+            if flag == 'Dynamic':
+                obj_type |= 1 << 5
+
+            pkt_temp = '%s%s.[%s|%d]' % (tbl_id, item.getItemId(), item.getItemName(), item.getItemLen())
+            obj_idx += '.%02x.%s.%s' % (obj_type, genLen(pkt_temp), pkt_temp)
+
+        obj_idx = '00.08.0100101001.000000' + obj_idx
+        obj_idx = '0x70.%s.%s' % (genLen(obj_idx), obj_idx)
 
     return obj_idx
 
 
 def genFunIdx(tbl_id, item_id, flag):
     fun_idx = '%s%s' % (tbl_id, item_id)
-    fun_idx = '10.%s.%s' % (genLen_Index(pkt=fun_idx), fun_idx)
+    fun_idx = '10.%s.%s' % (genLen(pkt=fun_idx), fun_idx)
     if flag == 'set':
-        fun_idx = '0x10.%s.%s' % (genLen_Index(pkt=fun_idx), fun_idx)
+        fun_idx = '0x10.%s.%s' % (genLen(fun_idx), fun_idx)
     elif flag == 'create':
-        fun_idx = '0x11.%s.%s' % (genLen_Index(pkt=fun_idx), fun_idx)
+        fun_idx = '0x11.%s.%s' % (genLen(fun_idx), fun_idx)
     elif flag == 'get':
-        fun_idx = '0x30.%s.%s' % (genLen_Index(pkt=fun_idx), fun_idx)
+        fun_idx = '0x30.%s.%s' % (genLen(fun_idx), fun_idx)
     else:
         fun_idx = ''
 
     return fun_idx
 
 
-ITEM_ID_LEN = 1
-TABLE_ID_LEN = 4
-PAYLOAD_LENGTH_LEN = 2
 def genPayload(tbl_id, item_list, flag):
     payload = ''
-    length = 0
+    has_string = False
     for item in item_list:
         if flag == 'set':
-            payload += '.%s%s.%s' % (item.getItemId(), genLen_Payload(item.getItemLen()), item.getItemName())
-            length += ITEM_ID_LEN + PAYLOAD_LENGTH_LEN + item.getItemLen()
+            if item.item_type == 'DISPLAYSTRING' or item.item_type == 'OCTSTRING':
+                var_data = '[%s]' % item.getItemName()
+                payload += '.%s[%s].%s' % (item.getItemId(), genLen(var_data), var_data)
+                has_string = True
+            else:
+                var_data = '[%s|%d]' % (item.getItemName(), item.getItemLen())
+                payload += '.%s%s.%s' % (item.getItemId(), genLen(var_data), var_data)
         elif flag == 'get':
-            payload += '.%s.%s' % (item.getItemId(), genLen_Payload(0))
-            length += ITEM_ID_LEN + PAYLOAD_LENGTH_LEN
+            payload += '.%s.%s' % (item.getItemId(), genLen(0))
         else:
             return ''
-    payload = '%s.%s%s' % (tbl_id, genLen_Payload(length), payload)
-    length += TABLE_ID_LEN + PAYLOAD_LENGTH_LEN
-    payload = '0x60.%s.%s' % (genLen_Index(length), payload)
+
+    if has_string:
+        payload = '%s.[%s]%s' % (tbl_id, genLen(payload), payload)
+        payload = '0x60.[%s].%s' % (genLen(payload), payload)
+    else:
+        payload = '%s.%s%s' % (tbl_id, genLen(payload), payload)
+        payload = '0x60.%s.%s' % (genLen(payload), payload)
 
     return payload
