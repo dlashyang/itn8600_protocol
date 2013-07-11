@@ -19,13 +19,50 @@ class ptn_table(object):
         self.tbl_id = ''
         self.tbl_type = 'Static'
         self.tbl_idx = []
-        self.item = []
+        self.item_list = []
+        self.item = {}
         self.pkt = {}
+        self.create_list = []
+        self.index_list = []
+        self.get_list = []
         self.combine_list = set()
+        self.combine_item = {}
 
-    def addItem(self, item):
-        self.item.append(item)
+    def addItem(self, name, item_id, item_len, item_type):
+        item = ptn_item(name, item_id, item_len, item_type)
+        self.item_list.append(item_id)
+        self.item[item_id] = item
 
+    def setItemAttr(self, item_id, idx, modify, create, read):
+        if self.item.has_key(item_id):
+            self.item[item_id].setAttr(idx, modify, create, read)
+
+            if idx == '1':
+                self.index_list.append(item_id)
+
+            if create == '1':
+                self.create_list.append(item_id)
+
+            if modify == '1':
+                self.item[item_id].setPkt('set.fun_idx', genFunIdx(self.tbl_id, item_id, 'set'))
+                self.item[item_id].setPkt('set.payload', genPayload(self.tbl_id, [self.item[item_id]], 'set'))
+
+            if read == '1':
+                self.get_list.append(item_id)
+                self.item[item_id].setPkt('get.fun_idx', genFunIdx(self.tbl_id, item_id, 'get'))
+                self.item[item_id].setPkt('get.payload', genPayload(self.tbl_id, [self.item[item_id]], 'get'))
+
+            if (idx == '1' or create == '1') and self.getTblType() == 'Static':
+                self.setTblType('Dynamic')
+
+    def addCombineIdx(self, combine_idx, item_id):
+        self.item[item_id].setModify(False)
+        self.combine_list.add(combine_idx)
+        if self.combine_item.has_key(combine_idx):
+            self.combine_item[combine_idx].append(item_id)
+        else:
+            self.combine_item[combine_idx] = [item_id]
+        
     def setTblId(self, tblid):
         self.tbl_id = tblid
 
@@ -39,7 +76,7 @@ class ptn_table(object):
         return self.tbl_type
 
     def getTblItem(self):
-        return self.item
+        return [self.item[item_id] for item_id in self.item_list]
 
     def getTblName(self):
         return self.tbl_name
@@ -48,42 +85,16 @@ class ptn_table(object):
         return self.pkt
 
     def genPackets(self):
-        create_list = []
-        index_list = []
-        get_list = []
-        combine_item = {}
-
-        for comb_idx in self.combine_list:
-            combine_item[comb_idx] = []
-
-        for item in self.item:
-            if 'C' in item.getAttr():
-                create_list.append(item)
-
-            if 'I' in item.getAttr():
-                index_list.append(item)
-
-            if 'M' in item.getAttr():
-                item.setPkt('set.fun_idx', genFunIdx(self.tbl_id, item.getItemId(), 'set'))
-                item.setPkt('set.payload', genPayload(self.tbl_id, [item], 'set'))
-
-            if 'R' in item.getAttr():
-                get_list.append(item)
-                item.setPkt('get.fun_idx', genFunIdx(self.tbl_id, item.getItemId(), 'get'))
-                item.setPkt('get.payload', genPayload(self.tbl_id, [item], 'get'))
-
-            if not item.combine_id == '':
-                combine_item[item.combine_id].append(item)
-
-        self.pkt['obj_idx'] = genObjIdx(self.tbl_id, index_list, self.tbl_type)
-        self.pkt['create.fun_idx'] = genFunIdx(self.tbl_id, 'FF', 'create')
-        self.pkt['create.payload'] = genPayload(self.tbl_id, create_list, 'set')
+        self.pkt['obj_idx'] = genObjIdx(self.tbl_id, [self.item[item_id] for item_id in self.index_list], self.tbl_type)
+        if not len(self.create_list) == 0:
+            self.pkt['create.fun_idx'] = genFunIdx(self.tbl_id, 'FF', 'create')
+            self.pkt['create.payload'] = genPayload(self.tbl_id, [self.item[item_id] for item_id in self.create_list], 'set')
         self.pkt['get.fun_idx'] = genFunIdx(self.tbl_id, 'FF', 'get')
-        self.pkt['get.payload'] = genPayload(self.tbl_id, get_list, 'get')
+        self.pkt['get.payload'] = genPayload(self.tbl_id, [self.item[item_id] for item_id in self.get_list], 'get')
 
         for comb_idx in self.combine_list:
             self.pkt['%s.fun_idx' % comb_idx] = genFunIdx(self.tbl_id, comb_idx, 'set')
-            self.pkt['%s.payload' % comb_idx] = genPayload(self.tbl_id, combine_item[comb_idx], 'set')
+            self.pkt['%s.payload' % comb_idx] = genPayload(self.tbl_id, [self.item[item_id] for item_id in self.combine_item[comb_idx]], 'set')
 
 class ptn_item(object):
     '''

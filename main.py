@@ -8,16 +8,6 @@ import ptnObject
 
 PHYSICALID = '0x70.0a.10.08.0100101001.000000'
 
-def genIdxLen(length):
-    if length < 0x80:
-        return '%02x' % length
-    elif length < 0x4000:
-        return '%04x' % (length + 0x8000)
-    elif length < 0x200000:
-        return '%06x' % (length + 0xc00000)
-    elif length < 0x10000000:
-        return '%08x' % (length + 0xe0000000)
-
 def readCsvFile(name):
     f = open('%s.csv' % name)
     tbl = None
@@ -36,17 +26,13 @@ def readCsvFile(name):
             if tbl.getTblId() == '':
                 tbl.setTblId(data[0].replace('0x', ''))
 
-            item = ptnObject.ptn_item(data[2], data[1].replace('0x', ''), data[6], data[3])
-            attr = item.setAttr(data[4], data[7], data[8], data[9])
-
-            if ('C' in attr) and (tbl.getTblType() == 'Static'):
-                tbl.setTblType('Dynamic')
+            item_id = data[1].replace('0x', '')
+            tbl.addItem(data[2], item_id, data[6], data[3])
+            tbl.setItemAttr(item_id, data[4], data[7], data[8], data[9])
 
             if not data[10] == '':
-                item.setCombineId(data[10])
-                tbl.combine_list.add(data[10])
+                tbl.addCombineIdx(data[10], item_id)
 
-            tbl.addItem(item)
         else:
             print(line)
             continue
@@ -61,7 +47,7 @@ def writeTxtFile(tbl_list, fname):
         tbl.genPackets()
         pkt = tbl.getPkt()
         f.write('\n%s:\n' % tbl.getTblName())
-        if tbl.getTblType() == 'Dynamic':
+        if tbl.getTblType() == 'Dynamic' and tbl.create_list != []:
             f.write('Create:\n%s\n%s\n%s\n' % (pkt['create.fun_idx'], pkt['obj_idx'], pkt['create.payload']))
             f.write('Create raw:\n%s\n%s\n%s\n' % (pkt['create.fun_idx'].replace('.', ''), pkt['obj_idx'].replace('.', ''), pkt['create.payload'].replace('.', '')))
             f.write('Delete:\n%s\n%s\n0x60\n' % (pkt['create.fun_idx'], pkt['obj_idx']))
