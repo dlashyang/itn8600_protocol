@@ -4,7 +4,8 @@ Created on 2013-7-3
 @author: dlash
 '''
 
-PHYSICALID = '10.08.0100101001.000000'
+PHYSICALID = u'10.08.0100101001.000000'
+PAYLOAD_TYPE_ITEM = u'fb'
 ITEM_ID_LEN = 1
 TABLE_ID_LEN = 4
 PAYLOAD_LENGTH_LEN = 2
@@ -34,28 +35,45 @@ class ptn_table(object):
         self.item[item_id] = item
 
     def setItemAttr(self, item_id, idx, modify, create, read):
+        isDynamic = False
         if self.item.has_key(item_id):
-            self.item[item_id].setAttr(idx, modify, create, read)
-
-            if idx == '1':
+            if idx == '1' or str(idx) == '1' or str(int(idx)) == '1':
+                self.item[item_id].setIndex(True)
                 self.index_list.append(item_id)
+                isDynamic = True
 
-            if create == '1':
+            if create == '1' or str(create) == '1' or str(int(create)) == '1':
+                self.item[item_id].setCreate(True)
                 self.create_list.append(item_id)
+                isDynamic = True
 
-            if modify == '1':
+            if modify == '1' or str(modify) == '1' or str(int(modify)) == '1':
+                self.item[item_id].setModify(True)
                 self.item[item_id].setPkt('set.fun_idx', genFunIdx(self.tbl_id, item_id, 'set'))
                 self.item[item_id].setPkt('set.payload', genPayload(self.tbl_id, [self.item[item_id]], 'set'))
 
-            if read == '1':
+            if read == '1' or str(read) == '1' or str(int(read)) == '1':
+                self.item[item_id].setRead(True)
                 self.get_list.append(item_id)
                 self.item[item_id].setPkt('get.fun_idx', genFunIdx(self.tbl_id, item_id, 'get'))
                 self.item[item_id].setPkt('get.payload', genPayload(self.tbl_id, [self.item[item_id]], 'get'))
 
-            if (idx == '1' or create == '1') and self.getTblType() == 'Static':
+            if isDynamic and self.getTblType() == 'Static':
                 self.setTblType('Dynamic')
 
-    def addCombineIdx(self, combine_idx, item_id):
+    def addCombineIdx(self, combine_idx_raw, item_id):
+        if isinstance(combine_idx_raw, float):
+            combine_idx = unicode(int(combine_idx_raw))
+        elif isinstance(combine_idx_raw, int):
+            combine_idx = unicode(combine_idx_raw)
+        elif isinstance(combine_idx_raw, (unicode, str)):
+            combine_idx = combine_idx_raw.lower().replace('0x', '')
+        else:
+            print('%s:%s' % (type(combine_idx_raw), combine_idx_raw))
+
+        if combine_idx.strip()=='':
+            return
+
         self.item[item_id].setModify(False)
         self.combine_list.add(combine_idx)
         if self.combine_item.has_key(combine_idx):
@@ -95,6 +113,24 @@ class ptn_table(object):
         for comb_idx in self.combine_list:
             self.pkt['%s.fun_idx' % comb_idx] = genFunIdx(self.tbl_id, comb_idx, 'set')
             self.pkt['%s.payload' % comb_idx] = genPayload(self.tbl_id, [self.item[item_id] for item_id in self.combine_item[comb_idx]], 'set')
+
+    def dbg_print(self):
+        print ('%s,%s' % (self.tbl_name, self.tbl_id))
+        print ('item_list:'),
+        print (self.item_list)
+        print ('index_list:'),
+        print (self.index_list)
+        print ('create_list:'),
+        print (self.create_list)
+        print ('get_list:'),
+        print (self.get_list)
+        print ('combine_list:'),
+        print (self.combine_list)
+        print ('combine_item:'),
+        print (self.combine_item)
+        print ('pkt:'),
+        print (self.pkt)
+
 
 class ptn_item(object):
     '''
@@ -170,11 +206,17 @@ class ptn_item(object):
     def setCombineId(self, combine_id):
         self.attrib = self.attrib.replace('M', '')
         self.combine_id = combine_id
+        
+    def dbg_print(self):
+        print ('%s,%s' % (self.item_name, self.item_id))
+        print ('pkt:'),
+        print (self.packet)
 
 def genLen(pkt):
-    if type(pkt) == int:
+#    print('%s:%s' % (type(pkt), pkt))
+    if isinstance(pkt, int):
         length = pkt
-    elif type(pkt) == str:
+    elif isinstance(pkt, (str, unicode)):
         pkt = pkt.replace('.', '')
         var_len = 0
         while '[' in pkt and ']' in pkt:
@@ -254,10 +296,12 @@ def genPayload(tbl_id, item_list, flag):
             return ''
 
     if has_string:
-        payload = '%s.[%s]%s' % (tbl_id, genLen(payload), payload)
+        payload = '%s.[%s]%s' % (PAYLOAD_TYPE_ITEM, genLen(payload), payload)
+        payload = '%s.[%s].%s' % (tbl_id, genLen(payload), payload)
         payload = '0x60.[%s].%s' % (genLen(payload), payload)
     else:
-        payload = '%s.%s%s' % (tbl_id, genLen(payload), payload)
+        payload = '%s.%s%s' % (PAYLOAD_TYPE_ITEM, genLen(payload), payload)
+        payload = '%s.%s.%s' % (tbl_id, genLen(payload), payload)
         payload = '0x60.%s.%s' % (genLen(payload), payload)
 
     return payload
