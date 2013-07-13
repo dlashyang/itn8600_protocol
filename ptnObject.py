@@ -208,7 +208,8 @@ class ptn_item(object):
         self.combine_id = combine_id
         
     def dbg_print(self):
-        print ('%s,%s' % (self.item_name, self.item_id))
+        print ('%s:%s' % (self.item_name, self.item_id))
+        print ('type:%s' % self.item_type)
         print ('pkt:'),
         print (self.packet)
 
@@ -254,11 +255,21 @@ def genObjIdx(tbl_id, index_list, flag):
             if flag == 'Dynamic':
                 obj_type |= 1 << 5
 
-            pkt_temp = '%s%s.[%s|%d]' % (tbl_id, item.getItemId(), item.getItemName(), item.getItemLen())
-            obj_idx += '.%02x.%s.%s' % (obj_type, genLen(pkt_temp), pkt_temp)
+            item.dbg_print()
+            if item.item_type in ('DISPLAYSTRING', 'OCTSTRING'):
+                pkt_temp = '%s%s.[%s]' % (tbl_id, item.getItemId(), item.getItemName())
+                obj_idx += '.%02x.[%s].%s' % (obj_type, genLen(pkt_temp), pkt_temp)
+                has_string = True
+            else:
+                pkt_temp = '%s%s.[%s|%d]' % (tbl_id, item.getItemId(), item.getItemName(), item.getItemLen())
+                obj_idx += '.%02x.%s.%s' % (obj_type, genLen(pkt_temp), pkt_temp)
+                has_string = False
 
         obj_idx = '00.08.0100101001.000000' + obj_idx
-        obj_idx = '0x70.%s.%s' % (genLen(obj_idx), obj_idx)
+        if has_string:
+            obj_idx = '0x70.[%s].%s' % (genLen(obj_idx), obj_idx)
+        else:
+            obj_idx = '0x70.%s.%s' % (genLen(obj_idx), obj_idx)
 
     return obj_idx
 
@@ -283,7 +294,7 @@ def genPayload(tbl_id, item_list, flag):
     has_string = False
     for item in item_list:
         if flag == 'set':
-            if item.item_type == 'DISPLAYSTRING' or item.item_type == 'OCTSTRING':
+            if item.item_type in ('DISPLAYSTRING', 'OCTSTRING'):
                 var_data = '[%s]' % item.getItemName()
                 payload += '.%s[%s].%s' % (item.getItemId(), genLen(var_data), var_data)
                 has_string = True

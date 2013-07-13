@@ -176,7 +176,7 @@ def genXml():
 
         for tbl in module[mod]:
             tbl.genPackets()
-            tbl.dbg_print()
+#            tbl.dbg_print()
             node_table = dom.createElement('Table')
             node_table.setAttribute('table_name', '%s' % tbl.getTblName())
             node_table.setAttribute('table_id', '%s' % tbl.getTblId())
@@ -194,13 +194,13 @@ def genXml():
                 node_table.appendChild(node)
 
             for item in tbl.getTblItem():
-                item.dbg_print()
+#                item.dbg_print()
                 pkt_item = item.getPkt()
                 node_item = dom.createElement('Item')
                 node_item.setAttribute('item_name', '%s' % item.getItemName())
                 node_item.setAttribute('item_id', '%s' % item.getItemId())
 
-                print ('%s:%s' % (type(item.getAttr()), item.getAttr()))
+#                print ('%s:%s' % (type(item.getAttr()), item.getAttr()))
                 if 'M' in item.getAttr():
                     node = genPktNode(dom, 'Set', pkt_item['set.fun_idx'], tbl.pkt['obj_idx'], pkt_item['set.payload'])
                     node_item.appendChild(node)
