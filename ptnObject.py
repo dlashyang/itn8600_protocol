@@ -37,7 +37,7 @@ class ptn_table(object):
     def setItemAttr(self, item_id, idx, modify, create, read):
         isDynamic = False
         if self.item.has_key(item_id):
-            if idx == '1' or str(idx) == '1' or str(int(idx)) == '1':
+            if not (idx == '0' or str(idx) == '0' or str(int(idx)) == '0'):
                 self.item[item_id].setIndex(True)
                 self.index_list.append(item_id)
                 isDynamic = True
@@ -93,8 +93,11 @@ class ptn_table(object):
     def getTblType(self):
         return self.tbl_type
 
-    def getTblItem(self):
+    def getTblItemList_all(self):
         return [self.item[item_id] for item_id in self.item_list]
+
+    def getTblItemDict(self):
+        return self.item
 
     def getTblName(self):
         return self.tbl_name
