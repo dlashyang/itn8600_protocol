@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
+
 '''
 Created on 2013-7-3
 
 @author: dlash
 '''
+
+from binascii import b2a_hex
 
 PHYSICALID = u'10.08.0100101001.000000'
 PAYLOAD_TYPE_ITEM = u'fb'
@@ -71,7 +75,7 @@ class ptn_table(object):
         else:
             print('%s:%s' % (type(combine_idx_raw), combine_idx_raw))
 
-        if combine_idx.strip()=='':
+        if combine_idx.strip() == '':
             return
 
         self.item[item_id].setModify(False)
@@ -80,7 +84,7 @@ class ptn_table(object):
             self.combine_item[combine_idx].append(item_id)
         else:
             self.combine_item[combine_idx] = [item_id]
-        
+
     def setTblId(self, tblid):
         self.tbl_id = tblid
 
@@ -209,7 +213,18 @@ class ptn_item(object):
     def setCombineId(self, combine_id):
         self.attrib = self.attrib.replace('M', '')
         self.combine_id = combine_id
-        
+
+    def formatValue(self, value):
+        if self.item_type == 'DISPLAYSTRING':
+            ret_str = b2a_hex(value)
+        else:
+            ret_str = '%08x' % int(value)
+
+        if len(ret_str) / 2 > self.item_len:
+            raise
+
+        return ret_str
+
     def dbg_print(self):
         print ('%s:%s' % (self.item_name, self.item_id))
         print ('type:%s' % self.item_type)
@@ -245,12 +260,16 @@ def genLen(pkt):
     elif length < 0x10000000:
         return '%08x' % (length + 0xe0000000)
 
-def genObjIdx(tbl_id, index_list, flag):
+def genObjIdx(tbl_id, index_list, flag, data_list=None):
+    if data_list:
+        if len(index_list) != len(data_list):
+            raise
+
     obj_idx = ''
     if len(index_list) == 0:
         obj_idx = '0x70.%s.%s' % (genLen(PHYSICALID), PHYSICALID)
     else:
-        for item in index_list:
+        for i, item in enumerate(index_list):
             obj_type = 0
             if item == index_list[-1]:
                 obj_type |= 1 << 4
@@ -258,15 +277,20 @@ def genObjIdx(tbl_id, index_list, flag):
             if flag == 'Dynamic':
                 obj_type |= 1 << 5
 
-            item.dbg_print()
-            if item.item_type in ('DISPLAYSTRING', 'OCTSTRING'):
-                pkt_temp = '%s%s.[%s]' % (tbl_id, item.getItemId(), item.getItemName())
-                obj_idx += '.%02x.[%s].%s' % (obj_type, genLen(pkt_temp), pkt_temp)
-                has_string = True
-            else:
-                pkt_temp = '%s%s.[%s|%d]' % (tbl_id, item.getItemId(), item.getItemName(), item.getItemLen())
+#            item.dbg_print()
+            if data_list:
+                pkt_temp = '%s%s.%s' % (tbl_id, item.getItemId(), item.formatValue(data_list[i]))
                 obj_idx += '.%02x.%s.%s' % (obj_type, genLen(pkt_temp), pkt_temp)
                 has_string = False
+            else:
+                if item.item_type in ('DISPLAYSTRING', 'OCTSTRING'):
+                    pkt_temp = '%s%s.[%s]' % (tbl_id, item.getItemId(), item.getItemName())
+                    obj_idx += '.%02x.[%s].%s' % (obj_type, genLen(pkt_temp), pkt_temp)
+                    has_string = True
+                else:
+                    pkt_temp = '%s%s.[%s|%d]' % (tbl_id, item.getItemId(), item.getItemName(), item.getItemLen())
+                    obj_idx += '.%02x.%s.%s' % (obj_type, genLen(pkt_temp), pkt_temp)
+                    has_string = False
 
         obj_idx = '00.08.0100101001.000000' + obj_idx
         if has_string:
@@ -292,18 +316,28 @@ def genFunIdx(tbl_id, item_id, flag):
     return fun_idx
 
 
-def genPayload(tbl_id, item_list, flag):
+def genPayload(tbl_id, item_list, flag, data_list=None):
+    if data_list:
+        print(item_list)
+        print(data_list)
+        if len(item_list) != len(data_list):
+            raise
+
     payload = ''
     has_string = False
-    for item in item_list:
+    for i, item in enumerate(item_list):
         if flag == 'set':
-            if item.item_type in ('DISPLAYSTRING', 'OCTSTRING'):
-                var_data = '[%s]' % item.getItemName()
-                payload += '.%s[%s].%s' % (item.getItemId(), genLen(var_data), var_data)
-                has_string = True
-            else:
-                var_data = '[%s|%d]' % (item.getItemName(), item.getItemLen())
+            if data_list:
+                var_data = '%s' % item.formatValue(data_list[i])
                 payload += '.%s%s.%s' % (item.getItemId(), genLen(var_data), var_data)
+            else:
+                if item.item_type in ('DISPLAYSTRING', 'OCTSTRING'):
+                    var_data = '[%s]' % item.getItemName()
+                    payload += '.%s[%s].%s' % (item.getItemId(), genLen(var_data), var_data)
+                    has_string = True
+                else:
+                    var_data = '[%s|%d]' % (item.getItemName(), item.getItemLen())
+                    payload += '.%s%s.%s' % (item.getItemId(), genLen(var_data), var_data)
         elif flag == 'get':
             payload += '.%s.%s' % (item.getItemId(), genLen(0))
         else:
