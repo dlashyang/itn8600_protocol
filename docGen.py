@@ -32,7 +32,7 @@ def readXlsxFile(name):
     
                 tbl = ptnObject.ptn_table(data[0])
 
-            elif str(data[0])[:2].lower() == '0x':
+            elif data[0][:2].lower() == '0x':
                 if sheet.ncols == 14:
                     data = data[:11]
                 elif sheet.ncols == 15:
@@ -50,7 +50,7 @@ def readXlsxFile(name):
                     tbl.addCombineIdx(data[10], item_id)
     
             else:
-                print(data)
+#                print(data)
                 continue
 
         tbl_list.append(tbl)
