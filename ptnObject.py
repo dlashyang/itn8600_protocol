@@ -218,7 +218,8 @@ class ptn_item(object):
         if self.item_type == 'DISPLAYSTRING':
             ret_str = b2a_hex(value)
         else:
-            ret_str = '%08x' % int(value)
+            ret_str = '%x' % int(value)
+            ret_str = ret_str.zfill(2 * self.item_len)
 
         if len(ret_str) / 2 > self.item_len:
             raise
@@ -318,8 +319,6 @@ def genFunIdx(tbl_id, item_id, flag):
 
 def genPayload(tbl_id, item_list, flag, data_list=None):
     if data_list:
-        print(item_list)
-        print(data_list)
         if len(item_list) != len(data_list):
             raise
 
